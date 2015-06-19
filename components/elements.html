@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<html>
+	<head>
+		<link rel="import" href="/ui/extlib/polymer/polymer.html" ></link>
+	</head>
+
+	<body>
+
+	<dom-module id="sf-list">
+		<script>
+			Polymer({
+				is: "sf-list",
+				ready: function() {
+					console.log("sf list ready!");
+					document.querySelector("#filterInput").onkeyup = function(e){
+						var model = document.querySelector("sf-model");
+						model.modelfilter = e.target.value;
+					}
+				}
+			});
+		</script>
+	</dom-module>
+
+	<dom-module id="sf-section">
+		<script>
+			Polymer({
+				is: "sf-section",
+				ready: function() {
+				console.log("sf section ready!")
+				}
+			});
+		</script>
+	</dom-module>
+
+	<dom-module id="sf-field">
+		<template>
+			<style>
+				.hide{
+					display: none;
+				}
+			</style>
+
+			<div><a class='labelColumn'>{{fieldlabel}}</a></div>
+		</template>
+		<script>
+			Polymer({
+				is: "sf-field",
+				properties: {
+					fieldlabel : {type: String, value: ""},
+					fieldtype : {type: String, value: ""},
+					fieldid : {type: String, value: ""}
+				},
+				ready: function() {
+					console.log("sf field ready!")
+				},
+				_fieldfilterChanged : function(){
+					this.fieldfilter = this.fieldfilter.substr(0, this.fieldfilter.length - 1);
+					if(this.fieldlabel.toLowerCase().indexOf(this.fieldfilter.toLowerCase()) != -1) this.isfilterout = true;
+					else isfilterout = false;
+				}
+			});
+		</script>
+	</dom-module>
+
+	<dom-module id="sf-model">
+		<template>
+			<style>
+				.hide{
+					display: none;
+				}
+			</style>
+
+			<div>
+				<a class$="{{changeIcon(iscollapsed)}}" on-click="toggleIcon"></a>
+				<a class='labelColumn'>{{modellabel}}</a>
+			</div>
+			<template is="dom-repeat" items="{{metafields}}" >
+				<template is="dom-if" if="{{item.hasChildren}}">
+					<sf-modelprovider class$="{{hideChildren(iscollapsed)}}" modellabel='{{item.label}}' modeltype='{{item.type}}' modelid='{{item.objectId}}' modelfilter='{{modelfilter}}' />
+				</template>
+
+				<template is="dom-if" if="{{!item.hasChildren}}">
+					<sf-field class$="{{hideField(iscollapsed, modelfilter, item.label)}}" fieldlabel='{{item.label}}' fieldtype='{{item.type}}' fieldid='{{item.objectId}}' />
+				</template>
+			</template>
+		</template>
+		<script>
+			Polymer({
+				is: "sf-model",
+				properties: {
+					modellabel : {type: String, value: ""},
+					modeltype : {type: String, value: ""},
+					modelid : {type: String, value: ""},
+					modelfilter : {type: String, value: "", notify: true , reflectToAttribute: true, observer : "_modelfilterChanged"},
+					iscollapsed : {type: Boolean, notify: true , value: false, observer : "_iscollapsedChanged"},
+					metafields : {type: Array, value: []}
+				},
+				ready: function() {
+					console.log("sf model ready!");
+					this.metafields = objHanlder._fieldData;
+
+				},
+				toggleIcon: function(e){
+					this.iscollapsed = !this.iscollapsed;
+				},
+				changeIcon: function(iscollapsed){
+					return iscollapsed ? 'toggleCollapsed toggle' : 'toggle';
+				},
+				hideChildren: function(iscollapsed){
+					return iscollapsed ? 'hide' : '';
+				},
+				hideField: function(iscollapsed, modelfilter, itemlabel){
+					return iscollapsed || itemlabel.toLowerCase().indexOf(modelfilter.toLowerCase()) == -1 ? 'hide' : '';
+				},
+				_modelfilterChanged : function(){
+					var models = Polymer.dom(this.root).querySelectorAll("sf-model");
+
+					for(var i in models){
+						models[i].modelfilter = this.modelfilter;
+					}
+				},
+				_iscollapsedChanged : function(){
+					var models = Polymer.dom(this.root).querySelectorAll("sf-model");
+
+					for(var i in models){
+						models[i].toggleClass("hide", this.iscollapsed);
+					}
+				}
+			});
+		</script>
+	</dom-module>
+
+	<dom-module id="sf-modelprovider">
+		<template>
+			<div>
+				<a id="toggleIcon" class='toggle toggleCollapsed' on-click="getMetaFields"></a>
+				<a class='labelColumn'>{{modellabel}}</a>
+			</div>
+			<template is="dom-if" if="{{isloading}}">
+				<div>Loading...</div>
+			</template>
+		</template>
+		<script>
+			Polymer({
+				is: "sf-modelprovider",
+				properties: {
+					modellabel : {type: String, value: ""},
+					modeltype : {type: String, value: ""},
+					modelid : {type: String, value: ""},
+					modelfilter : {type: String, notify: true , value: ""},
+					isloading : {type: Boolean, value: false},
+					isdataavailable : {type: Boolean, value: false}
+				},
+				ready: function() {
+					console.log("sf modelprovider ready!")
+				},
+				getMetaFields: function(target){
+
+					this.toggleClass("toggleCollapsed", false, this.$.toggleIcon);
+
+					this.isloading = true;
+					objHanlder.setObjectIdAndType(this.modelid, this.modeltype);
+
+					var me = this;
+
+					objHanlder.setFilter(null, false,
+						function(){
+							me.isloading = false;
+
+							var newsfmodel = document.createElement("sf-model");
+							newsfmodel.setAttribute("modellabel", me.modellabel);
+							newsfmodel.setAttribute("modeltype", me.modeltype);
+							newsfmodel.setAttribute("modelid", me.modelid);
+							var rootNode =  me.parentNode.root;
+							if(me.parentNode.tagName.toLowerCase() == "sf-model"){
+								newsfmodel.modelfilter = me.parentNode.modelfilter;
+								
+							}
+
+							Polymer.dom(rootNode).replaceChild(newsfmodel, me);
+							Polymer.dom().flush();
+
+						});
+				}
+			});
+		</script>
+	</dom-module>
+
+	<dom-module id="sf-functionprovider">
+		<template>
+			<div><a class='toggle toggleCollapsed' on-click="{{getFunctions}}"></a><a class='labelColumn'>{{modellabel}}</a></div>
+		</template>
+		<script>
+			Polymer({
+				is: "sf-functionprovider",
+				properties: {
+					modellabel : {type: String, value: ""},
+					modeltype : {type: String, value: ""},
+					modelid : {type: String, value: ""},
+					modelfilter : {type: String, value: ""}
+					},
+				ready: function() {
+					console.log("sf functionprovider ready!")
+				}
+			});
+		</script>
+	</dom-module>
+
+	<script type="text/javascript">
+		var objHanlder = new TreeObjectHandler({});
+	</script>
+	</body>
+</html>
